@@ -38,8 +38,21 @@ import org.springframework.security.config.annotation.web.builders.WebSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.SavedRequestAwareAuthenticationSuccessHandler;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.authentication.logout.LogoutHandler;
+import org.springframework.security.web.authentication.logout.LogoutSuccessHandler;
+import org.springframework.security.web.authentication.logout.SecurityContextLogoutHandler;
+import org.springframework.security.web.authentication.logout.SimpleUrlLogoutSuccessHandler;
+
+import java.io.IOException;
+
+import javax.servlet.ServletException;
+import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
 @Configuration
 @Order(2)
@@ -68,6 +81,15 @@ public class WebApplicationSecurity extends WebSecurityConfigurerAdapter {
                 new OsiamCachingAuthenticationFailureHandler("/login/error")
         );
 
+        LogoutSuccessHandler logoutSuccessHandler = new SimpleUrlLogoutSuccessHandler() {
+            @Override
+            public void onLogoutSuccess(HttpServletRequest request, HttpServletResponse response,
+                                        Authentication authentication) throws IOException, ServletException {
+                super.setTargetUrlParameter("post_logout_redirect_uri");
+                super.onLogoutSuccess(request, response, authentication);
+            }
+        };
+
         // @formatter:off
         http.requestMatchers()
                 .antMatchers("/login/**", "/error", "/oauth/**")
@@ -91,7 +113,17 @@ public class WebApplicationSecurity extends WebSecurityConfigurerAdapter {
                 .failureUrl("/login/error")
                 .loginPage("/login")
                 .and()
+            .logout()
+                .logoutUrl("/oauth/logout")
+                .logoutSuccessHandler(logoutSuccessHandler)
+                .clearAuthentication(true)
+                .invalidateHttpSession(true)
+                .deleteCookies("JSESSIONID")
+                .and()
             .addFilterBefore(loginDecisionFilter, UsernamePasswordAuthenticationFilter.class);
+
+        http.logout().logoutSuccessUrl("https://localhost/").invalidateHttpSession(true).logoutUrl("/oauth/logout");
+
         // @formatter:on
     }
 
